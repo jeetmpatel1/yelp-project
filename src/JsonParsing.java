@@ -1,110 +1,152 @@
-import org.json.*;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.*;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.LineIterator;
 
 
 public class JsonParsing {
 
-    public static void main(String[] args) throws IOException {
-        File outputFile = new File("output.txt");
-        File theFile = new File("yelp_business.json");
-        LineIterator it = FileUtils.lineIterator(theFile, "UTF-8");
-        FileWriter fileWriter = new FileWriter(outputFile,true);
+    static File outputFile;
+    static FileWriter fileWriter;
 
-        try (Stream linesStream = Files.lines(theFile.toPath())) {
-            linesStream.map(line -> parseBusinessObject((String) line)).forEach(output -> {
-                try {
-                    write((String) output,fileWriter);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
+    static {
+        outputFile = new File("output.sql");
+        if (outputFile.exists())
+            outputFile.delete();
+        try {
+            fileWriter = new FileWriter(outputFile, true);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    static File yelpBusinessFile;
+    static File yelpCheckinFile;
+    static File yelpReviewFile;
+    static File yelpUserFile;
+
+    /*static LineIterator yelpBusinessFileIterator ;
+    static LineIterator yelpCheckinFileIterator ;
+    static LineIterator yelpReviewFileIterator ;
+    static LineIterator yelpUserFileIterator ;*/
+
+    static HashSet<String> mainCategories = new HashSet<>(Arrays.asList("Active Life", "Arts & Entertainment", "Automotive", "Car Rental", "Cafes", "Beauty & Spas", "Convenience Stores", "Dentists", "Doctors", "Drugstores", "Department Stores", "Education", "Event Planning & Services", "Flowers & Gifts", "Food", "Health & Medical", "Home Services", "Home & Garden", "Hospitals", "Hotels & Travel", "Hardware Stores", "Grocery", "Medical Centers", "Nurseries & Gardening", "Nightlife", "Restaurants", "Shopping", "Transportation"));
+
+    public JsonParsing() throws IOException {
+    }
+
+
+    public static void createFile(String fileName) throws IOException {
+        if (fileName.equals("yelp_business.json")) {
+            /*yelpBusinessFile = new File(
+                    getClass().getClassLoader().getResource("yelp_business.json").getFile()
+            );*/
+            yelpBusinessFile = new File(fileName);
+            //yelpBusinessFileIterator = FileUtils.lineIterator(yelpBusinessFile, "UTF-8");
+        } else if (fileName.equals("yelp_user.json")) {
+            yelpUserFile = new File(fileName);
+           /* yelpUserFile = new File(
+                    getClass().getClassLoader().getResource("yelp_user.json").getFile()
+            );*/
+            //yelpUserFileIterator = FileUtils.lineIterator(yelpUserFile, "UTF-8");
+        } else if (fileName.equals("yelp_review.json")) {
+            yelpReviewFile = new File(fileName);
+            /*yelpReviewFile = new File(
+                    getClass().getClassLoader().getResource("yelp_review.json").getFile()
+            );*/
+            //yelpReviewFileIterator = FileUtils.lineIterator(yelpReviewFile, "UTF-8");
         }
 
-        /*try {
-            while (it.hasNext()) {
-                String line = it.nextLine();
-                try {
-                    PrintWriter printWriter = new PrintWriter(fileWriter,false);
-                    String output = parseBusinessObject(line);
-                    printWriter.print(output);
-                    printWriter.print("\n");
-                    printWriter.close();
-                } catch (Exception e) {
-                    System.out.println(e.getMessage());
-                }
-
-            }
-        } finally {
-            LineIterator.closeQuietly(it);
-        }*/
-        System.out.println("Finished");
-        //parseBusinessObject(str);
     }
-    private static void write(String record, Writer writer) throws IOException {
 
-        writer.write(record);
-        writer.write(System.getProperty( "line.separator" ));
-        writer.flush();
-
+    public static void parseBusinessFile() throws IOException {
+        FileReader fr = new FileReader(yelpBusinessFile);
+        BufferedReader brd = new BufferedReader(fr);
+        String line = brd.readLine();
+        while (line != null) {
+            JsonParsing.parseBusinessObject(line);
+            line = brd.readLine();
+        }
+        brd.close();
+        fr.close();
     }
-    public static String parseBusinessObject(String businessObject) {
-        JSONObject jsonBusinessObject = new JSONObject(businessObject);
+
+    public static void parseUserFile() throws IOException {
+        FileReader fr = new FileReader(yelpUserFile);
+        BufferedReader brd = new BufferedReader(fr);
+        String line = brd.readLine();
+        while (line != null) {
+            JsonParsing.parseUserObject(line);
+            line = brd.readLine();
+        }
+        brd.close();
+        fr.close();
+    }
+
+    public static void parseReviewFile() throws IOException {
+        FileReader fr = new FileReader(yelpReviewFile);
+        BufferedReader brd = new BufferedReader(fr);
+        String line = brd.readLine();
+        while (line != null) {
+            JsonParsing.parseReviewObject(line);
+            line = brd.readLine();
+        }
+        brd.close();
+        fr.close();
+    }
+
+    public static void parseBusinessObject(String businessObjectString) {
+        JSONObject jsonBusinessObject = new JSONObject(businessObjectString);
         String businessId = (String) jsonBusinessObject.get("business_id");
-        if(businessId.startsWith("uUsfpN81JCMKyH6c0D0bTg")){
-            System.out.println("Stops here");
-        }
-        String fullAddress = (String) jsonBusinessObject.get("full_address");
-        int isOpen = ((boolean) jsonBusinessObject.get("open")) ? 1 : 0;
+        String businessName = (String) jsonBusinessObject.get("name");
         String city = (String) jsonBusinessObject.get("city");
         String state = (String) jsonBusinessObject.get("state");
         int reviewCount = (int) jsonBusinessObject.get("review_count");
-        String businessName = (String) jsonBusinessObject.get("name");
-        JSONArray neighborhoods = (JSONArray) jsonBusinessObject.get("neighborhoods");
-        String neighborhoodsStr = neighborhoods.toString();
-        double longitude = jsonBusinessObject.getDouble("longitude");
-        double latitude = jsonBusinessObject.getDouble("latitude");
         double stars = jsonBusinessObject.getDouble("stars");
-        String businessType = (String) jsonBusinessObject.get("type");
 
+        JSONArray jsonCategories = jsonBusinessObject.getJSONArray("categories");
 
+        StringJoiner finalMainCatString = new StringJoiner(",");
+        StringJoiner finalSubCatString = new StringJoiner(",");
+
+        for (int i = 0; i < jsonCategories.length(); i++) {
+            String tempCategory = (String) jsonCategories.get(i);
+            if (mainCategories.contains(tempCategory)) {
+                finalMainCatString.add(tempCategory);
+            } else {
+                finalSubCatString.add(tempCategory);
+            }
+        }
 
         String insertStringForBusinessTable = "INSERT INTO y_business VALUES (" +
                 "q'[" + businessId + "]'" + "," +
-                "q'[" + fullAddress.replaceAll("\n"," ") + "]'" + "," +
-                "" + isOpen + "" + "," +
+                "q'[" + businessName + "]'" + "," +
                 "q'[" + city + "]'" + "," +
                 "q'[" + state + "]'" + "," +
                 "" + reviewCount + "" + "," +
-                "q'[" + businessName + "]'" + "," +
-                "q'[" + neighborhoods + "]'" + "," +
-                "" + longitude + "" + "," +
-                "" + latitude + "" + "," +
                 "" + stars + "" + "," +
-                "q'[" + businessType + "]'" +
-
-                ");";
-
-
-
-        List<String[]> hoursTableEntries = new ArrayList<String[]>();
-        JSONObject hours = jsonBusinessObject.getJSONObject("hours");
-        Iterator<String> keys = hours.keys();
-        while (keys.hasNext()) {
-            String day = keys.next();
-            JSONObject timePartObject = (JSONObject) hours.get(day);
-            String closeTime = timePartObject.getString("close");
-            String openTime = timePartObject.getString("open");
-            hoursTableEntries.add(new String[]{businessId, day, openTime, closeTime});
+                "q'[" + finalMainCatString.toString() + "]'" +
+                ")";
+        try {
+            write((String) insertStringForBusinessTable, fileWriter);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+        if (finalSubCatString.length() > 0) {
+            String insertStringForBusinessSubCatTable = "INSERT INTO y_business_sub_cat VALUES (" +
+                    "q'[" + businessId + "]'" + "," +
+                    "q'[" + finalSubCatString.toString() + "]'" +
+                    ")";
+            try {
+                write((String) insertStringForBusinessSubCatTable, fileWriter);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
 
         List<String> finalListOfAttributesToInsert = new ArrayList<String>();
         JSONObject attributes = jsonBusinessObject.getJSONObject("attributes");
@@ -154,8 +196,87 @@ public class JsonParsing {
             }
             attributeSingleKey = null;
         }
+        if (finalListOfAttributesToInsert.size() > 0) {
+            String insertStringForBusinessAttrsTable = "INSERT INTO y_business_attributes VALUES (q'[" + businessId + "]',q'[";
 
-        return insertStringForBusinessTable;
+            String temp = "";
+            for (String tempAttr : finalListOfAttributesToInsert) {
+                temp = insertStringForBusinessAttrsTable + tempAttr + "]')";
+                try {
+                    write((String) temp, fileWriter);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                temp = null;
+            }
+        }
+    }
+
+    public static void parseReviewObject(String reviewObject) {
+        JSONObject jsonReviewObject = new JSONObject(reviewObject);
+        String reviewId = (String) jsonReviewObject.get("review_id");
+        String userId = (String) jsonReviewObject.get("user_id");
+        String businessId = (String) jsonReviewObject.get("business_id");
+        String datePosted = (String) jsonReviewObject.get("date");
+        double starsCount = jsonReviewObject.getDouble("stars");
+        int finalVotesCount = 0;
+        JSONObject votesObject = (JSONObject) jsonReviewObject.get("votes");
+        for (String key : votesObject.keySet()) {
+            int val = votesObject.getInt(key);
+            finalVotesCount += val;
+        }
+        if (reviewId.equals("3f4iWELs16wiH7167-nCJg")) {
+            System.out.println("There");
+        }
+        String insertStringForReviewTable = "INSERT INTO y_review VALUES (" +
+                "q'[" + reviewId + "]'" + "," +
+                "q'[" + userId + "]'" + "," +
+                "q'[" + businessId + "]'" + "," +
+                "to_date('" + datePosted + "','YYYY-MM-DD')" + "," +
+                "" + finalVotesCount + "" + "," +
+                "" + starsCount +
+                ")";
+
+        try {
+            write((String) insertStringForReviewTable, fileWriter);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void parseUserObject(String userObjectString) throws IOException {
+        JSONObject jsonUserObject = new JSONObject(userObjectString);
+        String userId = (String) jsonUserObject.get("user_id");
+        String userName = (String) jsonUserObject.get("name");
+        String yelpingSince = (String) jsonUserObject.get("yelping_since");
+        int reviewCount = (int) jsonUserObject.get("review_count");
+        int friendsCount = jsonUserObject.getJSONArray("friends").length();
+        double avgStars = jsonUserObject.getDouble("average_stars");
+
+        int finalVotesCount = 0;
+        JSONObject votesObject = (JSONObject) jsonUserObject.get("votes");
+        for (String key : votesObject.keySet()) {
+            int val = votesObject.getInt(key);
+            finalVotesCount += val;
+        }
+
+        String insertStringForUserTable = "INSERT INTO y_user VALUES (" +
+                "q'[" + userId + "]'" + "," +
+                "q'[" + userName + "]'" + "," +
+                "to_date('" + yelpingSince + "','RR-MM')" + "," +
+                "" + reviewCount + "" + "," +
+                "" + friendsCount + "" + "," +
+                "" + avgStars + "" + "," +
+                "" + finalVotesCount + "" +
+                ")";
+        write(insertStringForUserTable, fileWriter);
+
+    }
+
+    private static void write(String record, Writer writer) throws IOException {
+        writer.write(record);
+        writer.write(System.getProperty("line.separator"));
+        writer.flush();
     }
 }
 
